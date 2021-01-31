@@ -16,6 +16,7 @@
  */
 package org.apache.commons.lang3.time;
 
+import java.util.SimpleTimeZone;
 import java.util.TimeZone;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -28,8 +29,10 @@ import java.util.regex.Pattern;
 public class FastTimeZone {
 
     private static final Pattern GMT_PATTERN = Pattern.compile("^(?:(?i)GMT)?([+-])?(\\d\\d?)?(:?(\\d\\d?))?$");
-
-    private static final TimeZone GREENWICH = new GmtTimeZone(false, 0, 0);
+    private static final int MILLISECONDS_PER_MINUTE = 60 * 1000;
+    private static final int MINUTES_PER_HOUR = 60;
+    private static final int HOURS_PER_DAY = 24;
+    private static final SimpleTimeZone GREENWICH = new SimpleTimeZone(0, "GMT");
 
     /**
      * Gets the GMT TimeZone.
@@ -58,7 +61,19 @@ public class FastTimeZone {
             if (hours == 0 && minutes == 0) {
                 return GREENWICH;
             }
-            return new GmtTimeZone(parseSign(m.group(1)), hours, minutes);
+
+            if (hours >= HOURS_PER_DAY) {
+                throw new IllegalArgumentException(hours + " hours out of range");
+            }
+            if (minutes >= MINUTES_PER_HOUR) {
+                throw new IllegalArgumentException(minutes + " minutes out of range");
+            }
+
+            final int milliseconds = (hours * MINUTES_PER_HOUR + minutes) * MILLISECONDS_PER_MINUTE;
+            if (parseSign(m.group(1))) {
+                return new SimpleTimeZone(-milliseconds, "GMT");
+            }
+            return new SimpleTimeZone(milliseconds, "GMT");
         }
         return null;
     }
@@ -69,7 +84,7 @@ public class FastTimeZone {
      * followed by sign, hours digit(s), optional colon(':'), and optional minutes digits.
      * i.e. <em>[GMT] (+|-) Hours [[:] Minutes]</em>
      *
-     * @param id A GMT custom id (or Olson id
+     * @param id A GMT custom id (or Olson id)
      * @return A time zone
      */
     public static TimeZone getTimeZone(final String id) {
